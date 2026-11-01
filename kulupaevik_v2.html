@@ -1,0 +1,694 @@
+<!doctype html>
+<html lang="et">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Kulupäevik">
+<title>Kulupäevik</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one narrow phone-first column. Month switcher, balance, quick-add form, category bars, dated entry list with inline editing, backup tools. */
+:root {
+  --bg: #f1f4f2;
+  --surface: #ffffff;
+  --fg: #14201c;
+  --muted: #5a6a63;
+  --line: #d9e1dd;
+  --accent: #1f5d50;
+  --accent-fg: #ffffff;
+  --inc: #1b7a4e;
+  --exp: #b3402f;
+  --inc-bg: #e3f2ea;
+  --exp-bg: #f8e6e2;
+  --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
+  --font-body: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1512;
+    --surface: #161f1b;
+    --fg: #e8efeb;
+    --muted: #93a49b;
+    --line: #26322c;
+    --accent: #5cc2a7;
+    --accent-fg: #07130f;
+    --inc: #5cc28a;
+    --exp: #f08a78;
+    --inc-bg: #17291f;
+    --exp-bg: #2c1b18;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1512;
+  --surface: #161f1b;
+  --fg: #e8efeb;
+  --muted: #93a49b;
+  --line: #26322c;
+  --accent: #5cc2a7;
+  --accent-fg: #07130f;
+  --inc: #5cc28a;
+  --exp: #f08a78;
+  --inc-bg: #17291f;
+  --exp-bg: #2c1b18;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.45;
+  padding-block: 20px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  font-variant-numeric: tabular-nums;
+}
+.wrap { max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+h1, h2, .num { font-family: var(--font-display); }
+h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+h2 { font-size: 15px; margin: 0 0 10px; letter-spacing: 0.01em; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.month { display: flex; align-items: center; gap: 4px; }
+.month button {
+  width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--surface); font-size: 18px; line-height: 1;
+}
+.month span { min-width: 124px; text-align: center; font-weight: 600; text-transform: capitalize; }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+
+.balance .label { color: var(--muted); font-size: 13px; }
+.balance .num { font-size: 40px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; margin: 2px 0 14px; }
+.balance .num.neg { color: var(--exp); }
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.chip { border-radius: 10px; padding: 10px 12px; min-width: 0; }
+.chip.inc { background: var(--inc-bg); }
+.chip.exp { background: var(--exp-bg); }
+.chip small { display: block; font-size: 12px; color: var(--muted); }
+.chip b { font-size: 17px; font-weight: 600; overflow-wrap: anywhere; }
+.chip.inc b { color: var(--inc); }
+.chip.exp b { color: var(--exp); }
+
+.demo {
+  border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px;
+  color: var(--muted); font-size: 13px;
+}
+
+form { display: flex; flex-direction: column; gap: 12px; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--bg); border-radius: 10px; padding: 3px; gap: 3px; }
+.seg button { border: 0; background: transparent; padding: 9px; border-radius: 8px; font-weight: 600; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--fg); box-shadow: 0 0 0 1px var(--line); }
+.seg button[data-type="exp"][aria-pressed="true"], .seg button[data-etype="exp"][aria-pressed="true"] { color: var(--exp); }
+.seg button[data-type="inc"][aria-pressed="true"], .seg button[data-etype="inc"][aria-pressed="true"] { color: var(--inc); }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.row.date-note { grid-template-columns: 1fr 1.3fr; }
+label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); min-width: 0; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+input, select, textarea {
+  background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 12px; font-size: 16px; color: var(--fg); width: 100%; min-width: 0;
+}
+#amount, #editAmount { font-size: 22px; font-family: var(--font-display); font-weight: 600; }
+.inline { display: flex; gap: 8px; }
+.inline input { width: auto; flex: 1; }
+.inline .ghost { white-space: nowrap; padding: 0 14px; font-size: 14px; }
+#halfNote { margin: 0; }
+.actions { display: flex; gap: 10px; }
+.primary {
+  flex: 1; background: var(--accent); color: var(--accent-fg); border: 0; border-radius: 10px;
+  padding: 12px 16px; font-weight: 600;
+}
+.ghost { background: transparent; border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
+.err { color: var(--exp); font-size: 13px; min-height: 1em; margin: 0; }
+
+.catwrap { position: relative; }
+.sugg {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 5;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  max-height: 208px; overflow-y: auto; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+}
+.sugg button {
+  display: block; width: 100%; text-align: left; border: 0; background: transparent;
+  padding: 10px 12px; font-size: 15px;
+}
+.sugg button.on, .sugg button:hover { background: var(--bg); }
+.sugg .newcat { padding: 10px 12px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); }
+.sugg .newcat:first-child { border-top: 0; }
+.sugg .newcat b { color: var(--fg); font-weight: 600; }
+
+.bars { display: flex; flex-direction: column; gap: 10px; }
+.bar .head { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; margin-bottom: 4px; }
+.bar .head span:last-child { color: var(--muted); }
+.track { height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; }
+.fill { height: 100%; background: var(--exp); border-radius: 4px; }
+.empty { color: var(--muted); font-size: 14px; margin: 0; }
+
+.day { margin-top: 14px; }
+.day:first-of-type { margin-top: 0; }
+.day h3 { font-size: 12px; font-weight: 600; color: var(--muted); margin: 0 0 4px; text-transform: capitalize; letter-spacing: 0.03em; }
+.entry {
+  display: flex; align-items: center; gap: 8px; padding: 10px 0; border-top: 1px solid var(--line);
+}
+.entry:first-of-type { border-top: 0; }
+.entry .main { flex: 1; min-width: 0; }
+.entry .cat { font-weight: 500; overflow-wrap: anywhere; }
+.entry .note { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.entry .amt { font-weight: 600; white-space: nowrap; }
+.entry .amt.inc { color: var(--inc); }
+.entry .amt.exp { color: var(--exp); }
+.act, .del { border: 1px solid var(--line); background: transparent; border-radius: 8px; height: 32px; color: var(--muted); }
+.act { padding: 0 10px; font-size: 13px; color: var(--fg); }
+.del { width: 32px; }
+.del.sure { width: auto; padding: 0 10px; color: var(--exp); border-color: var(--exp); font-size: 13px; }
+.editor {
+  margin: 6px 0; padding: 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px;
+}
+.editor input { background: var(--surface); }
+.editor .seg { background: var(--surface); }
+.editor .seg button[aria-pressed="true"] { background: var(--bg); }
+
+.tools { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+.tools button { flex: 1 1 auto; }
+textarea { min-height: 84px; resize: vertical; font-size: 14px; }
+.msg { font-size: 13px; color: var(--muted); margin: 8px 0 0; min-height: 1em; }
+.hint { color: var(--muted); font-size: 12.5px; margin: 0 0 12px; }
+@media (prefers-reduced-motion: no-preference) { .fill { transition: width .3s ease; } }
+
+html{color-scheme:light dark}
+body{margin:0}
+[hidden]{display:none!important}
+:root{padding-block:env(safe-area-inset-top,0px) env(safe-area-inset-bottom,0px)}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="top">
+    <h1>Kulupäevik</h1>
+    <div class="month">
+      <button type="button" id="prev" aria-label="Eelmine kuu">‹</button>
+      <span id="monthLabel"></span>
+      <button type="button" id="next" aria-label="Järgmine kuu">›</button>
+    </div>
+  </div>
+
+  <section class="panel balance" aria-label="Kuu kokkuvõte">
+    <div class="label">Kuu jääk</div>
+    <div class="num" id="balance">0,00 €</div>
+    <div class="split">
+      <div class="chip inc"><small>Tulud</small><b id="sumInc">0,00 €</b></div>
+      <div class="chip exp"><small>Kulud</small><b id="sumExp">0,00 €</b></div>
+    </div>
+  </section>
+
+  <div class="demo" id="demo" hidden>Need on näidisandmed, et näeksid, kuidas äpp töötab. Esimene sinu lisatud kanne kustutab need.</div>
+
+  <section class="panel" aria-label="Lisa kanne">
+    <h2>Lisa kanne</h2>
+    <form id="form" autocomplete="off">
+      <div class="seg" role="group" aria-label="Kanne tüüp">
+        <button type="button" data-type="exp" aria-pressed="true">Kulu</button>
+        <button type="button" data-type="inc" aria-pressed="false">Tulu</button>
+      </div>
+      <div class="field">
+        <label for="amount">Summa (€)</label>
+        <div class="inline">
+          <input id="amount" inputmode="decimal" placeholder="0,00" required>
+          <button class="ghost" type="button" id="halfBtn" aria-pressed="false">Jaga pooleks</button>
+        </div>
+        <p class="hint" id="halfNote" hidden></p>
+      </div>
+      <div class="catwrap">
+        <label>Kategooria
+          <input id="cat" autocomplete="off" maxlength="30" placeholder="Vali või kirjuta uus" aria-autocomplete="list">
+        </label>
+        <div class="sugg" id="catSugg" role="listbox" hidden></div>
+      </div>
+      <div class="row date-note">
+        <label>Kuupäev
+          <input id="date" type="date" required>
+        </label>
+        <label>Märkus (soovi korral)
+          <input id="note" maxlength="80" placeholder="Nt Rimi, bussipilet">
+        </label>
+      </div>
+      <p class="err" id="err" role="alert"></p>
+      <div class="actions">
+        <button class="primary" type="submit">Lisa</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="panel" aria-label="Kulud kategooriate kaupa">
+    <h2>Kulud kategooriate kaupa</h2>
+    <div class="bars" id="bars"></div>
+  </section>
+
+  <section class="panel" aria-label="Kanded">
+    <h2>Kanded</h2>
+    <div id="list"></div>
+  </section>
+
+  <section class="panel" aria-label="Andmed ja varukoopia">
+    <h2>Andmed ja varukoopia</h2>
+    <p class="hint">Andmed on salvestatud selle brauseri sisse, selle lehe aadressi alla. Brauseri andmete kustutamisel need kaovad, seega kopeeri aeg-ajalt varukoopia endale kuhugi (nt märkmikku).</p>
+    <div class="tools">
+      <button class="ghost" type="button" id="copyJson">Kopeeri varukoopia</button>
+      <button class="ghost" type="button" id="copyCsv">Kopeeri CSV (tabelisse)</button>
+    </div>
+    <label>Taasta varukoopiast: kleebi siia kopeeritud tekst või vali fail
+      <textarea id="importText" placeholder='[{"id":"…","type":"exp",…}]'></textarea>
+    </label>
+    <div class="tools" style="margin-top:10px">
+      <button class="ghost" type="button" id="doImport">Taasta</button>
+      <input type="file" id="importFile" accept=".json,.txt,application/json,text/plain">
+    </div>
+    <p class="msg" id="dataMsg" role="status"></p>
+  </section>
+</div>
+
+<script>
+(function () {
+  var KEY = "kulupaevik.v1";
+  var DEFAULTS = {
+    exp: ["Toit", "Snäkk", "Valmistoit", "Koju tellimine", "Kodu", "Transport", "Arved", "Tervis",
+          "Ilutooted", "Iluteenused", "Riided", "Meelelahutus", "Puhkus ja reisimine", "Kingitus", "Investeerimine", "Muu"],
+    inc: ["Palk", "Lisatulu", "Kingitus", "Muu"]
+  };
+  var MONTHS = ["jaanuar","veebruar","märts","aprill","mai","juuni","juuli","august","september","oktoober","november","detsember"];
+  var money = new Intl.NumberFormat("et-EE", { style: "currency", currency: "EUR" });
+  var $ = function (id) { return document.getElementById(id); };
+
+  var storageOk = true;
+  var entries = [];
+  var isDemo = false;
+  var type = "exp";
+  var edit = null;
+  var halfOrig = null;
+  var delTimer = null;
+  var view = ymd(new Date()).slice(0, 7);
+
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function ymd(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function fmt(c) { return money.format(c / 100); }
+  function plain(c) { return (c / 100).toFixed(2).replace(".", ","); }
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      return raw === null ? null : JSON.parse(raw);
+    } catch (e) { storageOk = false; return null; }
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(entries)); }
+    catch (e) { storageOk = false; }
+  }
+  try {
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+  } catch (e) {}
+
+  function demoData() {
+    var d = new Date(), m = view, out = [];
+    function mk(day, t, amt, cat, note) { out.push({ id: "demo" + out.length, type: t, amount: amt, cat: cat, date: m + "-" + pad(day), note: note }); }
+    var last = Math.min(d.getDate(), 28);
+    mk(1, "inc", 215000, "Palk", "");
+    mk(Math.min(2, last), "exp", 48000, "Kodu", "Üür");
+    mk(Math.min(3, last), "exp", 3260, "Toit", "Rimi");
+    mk(Math.min(5, last), "exp", 1450, "Transport", "Bussikaart");
+    mk(Math.min(7, last), "exp", 2190, "Meelelahutus", "Kino");
+    mk(Math.min(9, last), "exp", 5480, "Toit", "Selver");
+    mk(Math.min(11, last), "exp", 3990, "Arved", "Internet");
+    return out;
+  }
+
+  var stored = load();
+  if (stored === null) { entries = demoData(); isDemo = true; }
+  else {
+    entries = (Array.isArray(stored) ? stored : []).filter(function (e) {
+      return e && typeof e.date === "string" && Number.isInteger(e.amount) && (e.type === "exp" || e.type === "inc");
+    });
+  }
+
+  function parseAmount(s) {
+    var t = String(s).replace(/\s/g, "").replace(",", ".");
+    if (!/^\d+(\.\d{1,2})?$/.test(t)) return NaN;
+    return Math.round(parseFloat(t) * 100);
+  }
+
+  /* Kategooriad: varem sisestatud (sagedama järgi ees), siis ülejäänud vaikimisi kategooriad */
+  function catsFor(t) {
+    var count = {}, label = {}, order = [];
+    function add(c) {
+      var k = c.toLowerCase();
+      if (!(k in label)) { label[k] = c; order.push(k); count[k] = 0; }
+      return k;
+    }
+    entries.forEach(function (e) { if (e.type === t && e.cat) count[add(String(e.cat))]++; });
+    var used = order.slice().sort(function (a, b) { return count[b] - count[a]; });
+    DEFAULTS[t].forEach(add);
+    var rest = order.filter(function (k) { return used.indexOf(k) < 0; });
+    return used.concat(rest).map(function (k) { return label[k]; });
+  }
+  function normCat(s) {
+    var t = String(s).replace(/\s+/g, " ").trim().slice(0, 30);
+    return t ? t.charAt(0).toLocaleUpperCase("et") + t.slice(1) : "";
+  }
+  function canonical(name, t) {
+    var l = name.toLowerCase(), all = catsFor(t);
+    for (var i = 0; i < all.length; i++) if (all[i].toLowerCase() === l) return all[i];
+    return name;
+  }
+  function syncCat(input, t) {
+    var v = input.value.trim().toLowerCase();
+    if (!v) return;
+    var ok = catsFor(t).some(function (c) { return c.toLowerCase() === v; });
+    if (!ok) input.value = "";
+  }
+
+  /* Otsinguväli kategooriale: näitab pakkumisi tippimise ajal */
+  function attachCat(input, box, getType) {
+    var items = [], active = -1;
+    function mark() {
+      var btns = box.querySelectorAll("button");
+      for (var i = 0; i < btns.length; i++) btns[i].classList.toggle("on", i === active);
+      if (btns[active]) btns[active].scrollIntoView({ block: "nearest" });
+    }
+    function build() {
+      var q = input.value.trim().toLowerCase();
+      var all = catsFor(getType()), starts = [], inside = [];
+      all.forEach(function (c) {
+        var l = c.toLowerCase();
+        if (!q || l.indexOf(q) === 0) starts.push(c);
+        else if (l.indexOf(q) > 0) inside.push(c);
+      });
+      items = starts.concat(inside);
+      var exact = all.some(function (c) { return c.toLowerCase() === q; });
+      var html = items.map(function (c, i) { return '<button type="button" role="option" data-i="' + i + '">' + esc(c) + "</button>"; }).join("");
+      if (q && !exact) html += '<div class="newcat">Uus kategooria: <b>' + esc(normCat(input.value)) + "</b></div>";
+      box.innerHTML = html;
+      box.hidden = !html;
+      active = -1;
+    }
+    function pick(i) {
+      if (items[i] == null) return;
+      input.value = items[i];
+      box.hidden = true;
+      active = -1;
+    }
+    input.addEventListener("focus", build);
+    input.addEventListener("input", build);
+    input.addEventListener("blur", function () { setTimeout(function () { box.hidden = true; }, 150); });
+    input.addEventListener("keydown", function (ev) {
+      if (ev.key === "Escape") { box.hidden = true; return; }
+      if (ev.key === "ArrowDown" || ev.key === "ArrowUp") {
+        if (box.hidden) build();
+        if (!items.length) return;
+        ev.preventDefault();
+        active = ev.key === "ArrowDown" ? (active + 1) % items.length : (active <= 0 ? items.length - 1 : active - 1);
+        mark();
+      } else if (ev.key === "Enter" && !box.hidden && active >= 0) {
+        ev.preventDefault();
+        pick(active);
+      }
+    });
+    box.addEventListener("mousedown", function (ev) { ev.preventDefault(); });
+    box.addEventListener("click", function (ev) {
+      var b = ev.target.closest("button[data-i]");
+      if (b) pick(+b.dataset.i);
+    });
+  }
+
+  function setType(t) {
+    type = t;
+    $("form").querySelectorAll(".seg button").forEach(function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.type === t));
+    });
+    syncCat($("cat"), t);
+  }
+
+  function monthEntries() {
+    return entries.filter(function (e) { return e.date.slice(0, 7) === view; });
+  }
+
+  function editorHtml(e) {
+    return '<form class="editor" id="editForm" autocomplete="off">' +
+      '<div class="seg" role="group" aria-label="Kanne tüüp">' +
+        '<button type="button" data-etype="exp" aria-pressed="' + (edit.type === "exp") + '">Kulu</button>' +
+        '<button type="button" data-etype="inc" aria-pressed="' + (edit.type === "inc") + '">Tulu</button></div>' +
+      '<div class="row"><label>Summa (€)<input id="editAmount" inputmode="decimal" required value="' + esc(plain(e.amount)) + '"></label>' +
+      '<label>Kuupäev<input id="editDate" type="date" required value="' + esc(e.date) + '"></label></div>' +
+      '<div class="catwrap"><label>Kategooria<input id="editCat" autocomplete="off" maxlength="30" aria-autocomplete="list" value="' + esc(e.cat) + '"></label>' +
+      '<div class="sugg" id="editSugg" role="listbox" hidden></div></div>' +
+      '<label>Märkus (soovi korral)<input id="editNote" maxlength="80" value="' + esc(e.note) + '"></label>' +
+      '<p class="err" id="editErr" role="alert"></p>' +
+      '<div class="actions"><button class="primary" type="submit">Salvesta</button>' +
+      '<button class="ghost" type="button" data-cancel>Tühista</button></div></form>';
+  }
+
+  function render() {
+    var y = +view.slice(0, 4), mo = +view.slice(5, 7);
+    $("monthLabel").textContent = MONTHS[mo - 1] + " " + y;
+    $("demo").hidden = !isDemo;
+
+    var list = monthEntries().sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
+    var inc = 0, exp = 0, byCat = {};
+    list.forEach(function (e) {
+      if (e.type === "inc") inc += e.amount;
+      else { exp += e.amount; byCat[e.cat] = (byCat[e.cat] || 0) + e.amount; }
+    });
+    var bal = inc - exp;
+    var bEl = $("balance");
+    bEl.textContent = fmt(bal);
+    bEl.className = "num" + (bal < 0 ? " neg" : "");
+    $("sumInc").textContent = fmt(inc);
+    $("sumExp").textContent = fmt(exp);
+
+    var cats = Object.keys(byCat).sort(function (a, b) { return byCat[b] - byCat[a]; });
+    $("bars").innerHTML = cats.length ? cats.map(function (c) {
+      var pct = exp ? byCat[c] / exp * 100 : 0;
+      return '<div class="bar"><div class="head"><span>' + esc(c) + '</span><span>' + fmt(byCat[c]) + " · " + Math.round(pct) + '%</span></div>' +
+        '<div class="track"><div class="fill" style="width:' + pct.toFixed(1) + '%"></div></div></div>';
+    }).join("") : '<p class="empty">Selles kuus pole kulusid.</p>';
+
+    if (!list.length) {
+      $("list").innerHTML = '<p class="empty">Selles kuus pole kandeid. Lisa esimene ülal olevast vormist.</p>';
+    } else {
+      var html = "", curDay = "";
+      list.forEach(function (e) {
+        if (e.date !== curDay) {
+          if (curDay) html += "</div>";
+          curDay = e.date;
+          var dt = new Date(e.date + "T12:00:00");
+          html += '<div class="day"><h3>' + esc(dt.toLocaleDateString("et-EE", { weekday: "short", day: "numeric", month: "short" })) + "</h3>";
+        }
+        if (edit && edit.id === e.id) { html += editorHtml(e); return; }
+        html += '<div class="entry"><div class="main">' +
+          '<div class="cat">' + esc(e.cat) + '</div>' + (e.note ? '<div class="note">' + esc(e.note) + "</div>" : "") + "</div>" +
+          '<span class="amt ' + e.type + '">' + (e.type === "inc" ? "+" : "−") + fmt(e.amount) + "</span>" +
+          (isDemo ? "" :
+            '<button class="act" type="button" data-edit="' + esc(e.id) + '">Muuda</button>' +
+            '<button class="del" type="button" data-del="' + esc(e.id) + '" aria-label="Kustuta kanne">×</button>') +
+          "</div>";
+      });
+      $("list").innerHTML = html + "</div>";
+    }
+    if (edit && $("editCat")) {
+      attachCat($("editCat"), $("editSugg"), function () { return edit.type; });
+    }
+  }
+
+  function updateHalf() {
+    var on = halfOrig !== null;
+    $("halfBtn").textContent = on ? "Võta tagasi" : "Jaga pooleks";
+    $("halfBtn").setAttribute("aria-pressed", String(on));
+    $("halfNote").hidden = !on;
+    if (on) $("halfNote").textContent = "Summa on jagatud kahega. Algne summa oli " + halfOrig + " €.";
+  }
+  $("halfBtn").addEventListener("click", function () {
+    if (halfOrig !== null) {
+      $("amount").value = halfOrig; halfOrig = null; updateHalf(); return;
+    }
+    var c = parseAmount($("amount").value);
+    if (!(c > 0)) { $("err").textContent = "Sisesta enne summa, mida jagada."; $("amount").focus(); return; }
+    $("err").textContent = "";
+    halfOrig = $("amount").value.trim();
+    $("amount").value = plain(Math.round(c / 2));
+    updateHalf();
+  });
+  $("amount").addEventListener("input", function () { halfOrig = null; updateHalf(); });
+
+  function resetForm() {
+    $("amount").value = ""; $("note").value = ""; $("cat").value = ""; $("err").textContent = "";
+    $("date").value = ymd(new Date());
+    halfOrig = null; updateHalf();
+  }
+
+  attachCat($("cat"), $("catSugg"), function () { return type; });
+
+  $("form").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var amt = parseAmount($("amount").value);
+    var cat = normCat($("cat").value);
+    if (!(amt > 0)) { $("err").textContent = "Sisesta summa, nt 12,50."; return; }
+    if (!cat) { $("err").textContent = "Vali kategooria või kirjuta uus."; $("cat").focus(); return; }
+    if (!$("date").value) { $("err").textContent = "Vali kuupäev."; return; }
+    if (isDemo) { entries = []; isDemo = false; }
+    var rec = { id: uid(), type: type, amount: amt, cat: canonical(cat, type), date: $("date").value, note: $("note").value.trim() };
+    entries.push(rec);
+    save();
+    view = rec.date.slice(0, 7);
+    edit = null;
+    resetForm();
+    render();
+    $("amount").focus();
+  });
+
+  $("form").querySelector(".seg").addEventListener("click", function (ev) {
+    var b = ev.target.closest("button"); if (b) setType(b.dataset.type);
+  });
+
+  function clearSure() {
+    document.querySelectorAll(".del.sure").forEach(function (b) { b.classList.remove("sure"); b.textContent = "×"; });
+  }
+
+  $("list").addEventListener("click", function (ev) {
+    var ed = ev.target.closest("[data-edit]");
+    var dl = ev.target.closest("[data-del]");
+    var et = ev.target.closest("[data-etype]");
+    var cn = ev.target.closest("[data-cancel]");
+    if (et && edit) {
+      edit.type = et.dataset.etype;
+      $("list").querySelectorAll("[data-etype]").forEach(function (b) {
+        b.setAttribute("aria-pressed", String(b.dataset.etype === edit.type));
+      });
+      syncCat($("editCat"), edit.type);
+    } else if (cn) {
+      edit = null; render();
+    } else if (ed) {
+      var e = entries.filter(function (x) { return x.id === ed.dataset.edit; })[0];
+      if (!e || isDemo) return;
+      edit = { id: e.id, type: e.type };
+      render();
+      var f = $("editAmount");
+      if (f) { f.scrollIntoView({ block: "nearest" }); f.focus(); }
+    } else if (dl) {
+      if (isDemo) return;
+      if (dl.classList.contains("sure")) {
+        clearTimeout(delTimer);
+        entries = entries.filter(function (x) { return x.id !== dl.dataset.del; });
+        if (edit && edit.id === dl.dataset.del) edit = null;
+        save(); render();
+      } else {
+        clearTimeout(delTimer);
+        clearSure();
+        dl.classList.add("sure"); dl.textContent = "Kustuta?";
+        delTimer = setTimeout(clearSure, 3500);
+      }
+    }
+  });
+
+  $("list").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    if (!edit) return;
+    var err = $("editErr");
+    var amt = parseAmount($("editAmount").value);
+    var date = $("editDate").value;
+    var cat = normCat($("editCat").value);
+    if (!(amt > 0)) { err.textContent = "Sisesta summa, nt 12,50."; return; }
+    if (!date) { err.textContent = "Vali kuupäev."; return; }
+    if (!cat) { err.textContent = "Vali kategooria või kirjuta uus."; return; }
+    var rec = { id: edit.id, type: edit.type, amount: amt, cat: canonical(cat, edit.type), date: date, note: $("editNote").value.trim() };
+    entries = entries.map(function (x) { return x.id === edit.id ? rec : x; });
+    save();
+    view = date.slice(0, 7);
+    edit = null;
+    render();
+  });
+
+  $("prev").addEventListener("click", function () { shift(-1); });
+  $("next").addEventListener("click", function () { shift(1); });
+  function shift(n) {
+    var y = +view.slice(0, 4), m = +view.slice(5, 7) - 1 + n;
+    var d = new Date(y, m, 1);
+    view = d.getFullYear() + "-" + pad(d.getMonth() + 1);
+    edit = null;
+    if (isDemo) entries = demoData();
+    render();
+  }
+
+  function msg(t) { $("dataMsg").textContent = t; }
+  function copyText(text, okMsg) {
+    var done = function () { msg(okMsg); };
+    var fallback = function () {
+      var ta = $("importText");
+      ta.value = text; ta.focus(); ta.select();
+      msg("Kopeerimine ei õnnestunud automaatselt. Tekst on allolevas väljas valitud, kopeeri see käsitsi.");
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, fallback);
+    } else fallback();
+  }
+  function real() { return isDemo ? [] : entries; }
+
+  $("copyJson").addEventListener("click", function () {
+    if (!real().length) { msg("Pole veel midagi varundada."); return; }
+    copyText(JSON.stringify(real()), "Varukoopia on kopeeritud. Kleebi see kuhugi turvalisse kohta.");
+  });
+  $("copyCsv").addEventListener("click", function () {
+    if (!real().length) { msg("Pole veel midagi eksportida."); return; }
+    var rows = ["Kuupäev;Tüüp;Kategooria;Summa;Märkus"];
+    real().slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; }).forEach(function (e) {
+      rows.push([e.date, e.type === "inc" ? "Tulu" : "Kulu", e.cat, (e.amount / 100).toFixed(2).replace(".", ","), '"' + (e.note || "").replace(/"/g, '""') + '"'].join(";"));
+    });
+    copyText(rows.join("\n"), "CSV on kopeeritud. Kleebi see Google Sheetsi või Excelisse.");
+  });
+
+  function doImport(text) {
+    var data;
+    try { data = JSON.parse(text); } catch (e) { msg("Seda teksti ei saanud lugeda. Kasuta varukoopiana kopeeritud teksti."); return; }
+    if (!Array.isArray(data)) { msg("Varukoopia peab olema kannete loend."); return; }
+    var have = {}, base = real().slice();
+    base.forEach(function (e) { have[e.id] = 1; });
+    var added = 0;
+    data.forEach(function (e) {
+      if (e && typeof e.id === "string" && (e.type === "exp" || e.type === "inc") && Number.isInteger(e.amount) && e.amount > 0 && /^\d{4}-\d{2}-\d{2}$/.test(e.date) && !have[e.id]) {
+        base.push({ id: e.id, type: e.type, amount: e.amount, cat: String(e.cat || "Muu").slice(0, 30), date: e.date, note: String(e.note || "").slice(0, 80) });
+        have[e.id] = 1; added++;
+      }
+    });
+    entries = base; isDemo = false; edit = null; save(); render();
+    $("importText").value = "";
+    msg(added ? "Taastatud " + added + " kannet." : "Uusi kandeid ei leitud, kõik olid juba olemas.");
+  }
+  $("doImport").addEventListener("click", function () {
+    var t = $("importText").value.trim();
+    if (!t) { msg("Kleebi enne varukoopia tekst."); return; }
+    doImport(t);
+  });
+  $("importFile").addEventListener("change", function (ev) {
+    var f = ev.target.files && ev.target.files[0]; if (!f) return;
+    var r = new FileReader();
+    r.onload = function () { doImport(String(r.result)); };
+    r.readAsText(f);
+  });
+
+  setType("exp");
+  resetForm();
+  render();
+  if (!storageOk) msg("Salvestamine pole selles aknas saadaval, kanded jäävad alles ainult kuni lehe sulgemiseni.");
+})();
+</script>
+
+</body>
+</html>
